@@ -62,21 +62,34 @@ def pde(out, fx, fy):
 
 def pdeLoss(t):
     out = model(t).to(device)
-    f1 = pde(out, a, b)
+    f1 = pde(out, x, y)
+    g_true = torch.matmul(torch.mul(x, torch.pi).sin(), torch.mul(y, torch.pi).sin().unsqueeze(1)) # не доделал тензор с примененной функцией g
 
-    inlet_mask = (t[:, 0] == 0)
-    t0 = t[inlet_mask]
-    x0 = model(t0).to(device)
-    dx0dt = torch.autograd.grad(x0, t0, torch.ones_like(t0), create_graph=True, \
-                        retain_graph=True)[0]
-
-    loss_bc = metric_data(x0, x0_true) + \
-                metric_data(dx0dt, dx0dt_true.to(device))
+    loss_bc = metric_data(x0, x0_true) + metric_data(dx0dt, dx0dt_true.to(device))
     loss_pde = metric_data(f1, torch.zeros_like(f1))
 
-    loss = 1e3*loss_bc + loss_pde
+    loss = loss_bc + loss_pde
 
     return loss
+
+
+def train():
+
+
+    for step in pbar:
+        def closure():
+            optimizer.zero_grad()
+            loss = pdeLoss(t)
+            loss.backward()
+            return loss
+
+        optimizer.step(closure)
+        if step % 2 == 0:
+            current_loss = closure().item()
+            pbar.set_description("Step: %d | Loss: %.6f" %
+                                 (step, current_loss))
+            writer.add_scalar('Loss/train', current_loss, step)
+
 
 
 
@@ -101,12 +114,11 @@ if __name__ == "__main__":
 
     # Создание сетки:
 
-    a = torch.linspace(Q[0][0], Q[0][1], step)
-    a.requires_grad = True
-    b = torch.linspace(Q[1][0], Q[1][1], step)
-    b.requires_grad = True
-    t = torch.cartesian_prod(a, b)
-    t.requires_grad = True
+    x = torch.linspace(Q[0][0], Q[0][1], step)
+    x.requires_grad = True
+    y = torch.linspace(Q[1][0], Q[1][1], step)
+    y.requires_grad = True
+    t = torch.cartesian_prod(x, y)
 
 
     # Создание шкалы загрузки:
@@ -118,5 +130,5 @@ if __name__ == "__main__":
 
     metric_data = nn.MSELoss()
     writer = SummaryWriter()
-    optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
+    optimizer = torch.optim.adam(model.parameters(), lr=0.1)
 

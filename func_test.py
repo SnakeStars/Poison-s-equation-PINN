@@ -1,5 +1,9 @@
 import torch
 
+Q = [[0, 2], [0, 2]]                    # Borders
+step = 10                               # points in one dim
+EPOH = 1000                             # study iterations
+
 device = (
     "cuda"
     if torch.cuda.is_available()
@@ -7,11 +11,12 @@ device = (
     if torch.backends.mps.is_available()
     else "cpu"
 )
-print(f"Using {device} device")
 
-
-print(torch.cartesian_prod(torch.arange(0, 1, 0.2), torch.arange(0, 1, 0.2)))
-
+x = torch.linspace(Q[0][0], Q[0][1], step)
+y = torch.linspace(Q[1][0], Q[1][1], step)
+g = torch.matmul(torch.mul(x, torch.pi).sin(), torch.mul(y, torch.pi).sin())
+data = [torch.mul(y, torch.pi).sin() for i in range(10)]
+print(torch.mul(data, torch.pi).sin())
 # w = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 # b = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 # x = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
