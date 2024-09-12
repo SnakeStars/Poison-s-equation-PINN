@@ -38,21 +38,21 @@ class NeuralNetwork(nn.Module):
         )
 
     def forward(self, dat):
-        return self.tanh_layers_stack(self.flatten(dat))
+        return self.tanh_layers_stack(self.dat)
     
 model = NeuralNetwork().to(device)
 print(model)
 
 # Уравнение функции
 
-def pde(outx, outy, fx, fy):
+def pde(out, fx, fy):
 
-    dudx = (torch.autograd.grad(outx, fx, torch.ones_like(fx), create_graph=True,
+    dudx = (torch.autograd.grad(out, fx, torch.ones_like(fx), create_graph=True,
                             retain_graph=True)[0])
     d2udx2 = (torch.autograd.grad(dudx, fx, torch.ones_like(fx), create_graph=True,
                             retain_graph=True)[0])
     
-    dudy = (torch.autograd.grad(outy, fy, torch.ones_like(fy), create_graph=True,
+    dudy = (torch.autograd.grad(out, fy, torch.ones_like(fy), create_graph=True,
                             retain_graph=True)[0])
     d2udy2 = (torch.autograd.grad(dudy, fy, torch.ones_like(fy), create_graph=True,
                             retain_graph=True)[0])
@@ -62,7 +62,7 @@ def pde(outx, outy, fx, fy):
 
 def pdeLoss(t):
     out = model(t).to(device)
-    f1 = pde(out, t)
+    f1 = pde(out, a, b)
 
     inlet_mask = (t[:, 0] == 0)
     t0 = t[inlet_mask]
@@ -75,24 +75,6 @@ def pdeLoss(t):
     loss_pde = metric_data(f1, torch.zeros_like(f1))
 
     loss = 1e3*loss_bc + loss_pde
-
-    metric_x = metric_data(out, x0_true * torch.sin(omega*t + torch.pi / 2))
-    metric_x0 = metric_data(x0, x0_true)
-    metric_dx0dt = metric_data(dx0dt, dx0dt_true.to(device))
-
-    acc_metrics = {'metric_x': metric_x,
-                'metric_x0': metric_x0,
-                'metric_dx0dt': metric_dx0dt,
-                }
-
-    metrics = {'loss': loss,
-                'loss_bc': loss_bc,
-                'loss_pde': loss_pde,
-                }
-    for k, v in metrics.items():
-        run[k].append(v)
-    for k, v in acc_metrics.items():
-        run[k].append(v)
 
     return loss
 
@@ -119,8 +101,12 @@ if __name__ == "__main__":
 
     # Создание сетки:
 
-    t = torch.cartesian_prod(torch.linspace(Q[0][0], Q[0][1], step), torch.linspace(Q[1][0], Q[1][1], step))
-    t.requires_grad(True)
+    a = torch.linspace(Q[0][0], Q[0][1], step)
+    a.requires_grad = True
+    b = torch.linspace(Q[1][0], Q[1][1], step)
+    b.requires_grad = True
+    t = torch.cartesian_prod(a, b)
+    t.requires_grad = True
 
 
     # Создание шкалы загрузки:
@@ -133,3 +119,4 @@ if __name__ == "__main__":
     metric_data = nn.MSELoss()
     writer = SummaryWriter()
     optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
+
