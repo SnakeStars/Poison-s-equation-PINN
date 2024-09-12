@@ -50,6 +50,18 @@ def pde(outx, outy, fx, fy):
     
     dudy = (torch.autograd.grad(outy, fy, torch.ones_like(fy), create_graph=True,
                             retain_graph=True)[0])
-    d2udy2 = (torch.autograd.grad(dudy, fx, torch.ones_like(fy), create_graph=True,
+    d2udy2 = (torch.autograd.grad(dudy, fy, torch.ones_like(fy), create_graph=True,
                             retain_graph=True)[0])
     return d2udx2 + d2udy2
+
+
+if __name__ == "__main__":
+
+    #  Задание параметров модели:
+    Q = [[0, 2], [0, 2]]                    # Borders
+    step = 10                               # points in one dim
+
+
+    # Создание сетки:
+    t = torch.cartesian_prod(torch.linspace(Q[0][0], Q[0][1], step), torch.linspace(Q[1][0], Q[1][1], step))
+    print(t)
