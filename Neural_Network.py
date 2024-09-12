@@ -40,3 +40,16 @@ class NeuralNetwork(nn.Module):
     
 model = NeuralNetwork().to(device)
 print(model)
+
+def pde(outx, outy, fx, fy):
+
+    dudx = (torch.autograd.grad(outx, fx, torch.ones_like(fx), create_graph=True,
+                            retain_graph=True)[0])
+    d2udx2 = (torch.autograd.grad(dudx, fx, torch.ones_like(fx), create_graph=True,
+                            retain_graph=True)[0])
+    
+    dudy = (torch.autograd.grad(outy, fy, torch.ones_like(fy), create_graph=True,
+                            retain_graph=True)[0])
+    d2udy2 = (torch.autograd.grad(dudy, fx, torch.ones_like(fy), create_graph=True,
+                            retain_graph=True)[0])
+    return d2udx2 + d2udy2
