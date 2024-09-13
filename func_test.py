@@ -12,11 +12,17 @@ device = (
     else "cpu"
 )
 
-x = torch.linspace(Q[0][0], Q[0][1], step)
-y = torch.linspace(Q[1][0], Q[1][1], step)
-g = torch.matmul(torch.mul(x, torch.pi).sin(), torch.mul(y, torch.pi).sin())
-data = [torch.mul(y, torch.pi).sin() for i in range(10)]
-print(torch.mul(data, torch.pi).sin())
+step = 2
+x = torch.linspace(0, 2, step)
+x.requires_grad = True
+y = torch.linspace(1, 3, step)
+y.requires_grad = True
+t = torch.cartesian_prod(x, y)
+print(t)
+print(torch.mul(torch.tensor([1,2,3]), torch.tensor([2,3,4]).unsqueeze(1)))
+
+
+
 # w = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 # b = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 # x = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])

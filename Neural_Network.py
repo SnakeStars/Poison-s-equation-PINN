@@ -63,7 +63,8 @@ def pde(out, fx, fy):
 def pdeLoss(t):
     out = model(t).to(device)
     f1 = pde(out, x, y)
-    g_true = torch.matmul(torch.mul(x, torch.pi).sin(), torch.mul(y, torch.pi).sin().unsqueeze(1)) # не доделал тензор с примененной функцией g
+    g_true = torch.mul(torch.tensor(x), torch.tensor(y).unsqueeze(1))
+    f_bc = 
 
     loss_bc = metric_data(x0, x0_true) + metric_data(dx0dt, dx0dt_true.to(device))
     loss_pde = metric_data(f1, torch.zeros_like(f1))
