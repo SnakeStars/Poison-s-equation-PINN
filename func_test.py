@@ -12,13 +12,17 @@ device = (
     else "cpu"
 )
 
-step = 2
+step = 6
 x = torch.linspace(0, 2, step)
 x.requires_grad = True
-y = torch.linspace(1, 3, step)
+y = torch.linspace(0, 2, step)
 y.requires_grad = True
 t = torch.cartesian_prod(x, y)
+
+# t_bc = torch.cat(, )
+# f_bc = 
 print(t)
+print(t[(t[:,0] == 0) & (t[:,1] != 0)])
 print(torch.mul(torch.tensor([1,2,3]), torch.tensor([2,3,4]).unsqueeze(1)))
 
 
