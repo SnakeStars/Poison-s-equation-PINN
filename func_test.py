@@ -12,18 +12,18 @@ device = (
     else "cpu"
 )
 
-step = 6
+step = 4
 x = torch.linspace(0, 2, step)
 x.requires_grad = True
 y = torch.linspace(0, 2, step)
 y.requires_grad = True
 t = torch.cartesian_prod(x, y)
 
-# t_bc = torch.cat(, )
-# f_bc = 
+t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], 
+                     t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],
+                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
 print(t)
-print(t[(t[:,0] == 0) & (t[:,1] != 0)])
-print(torch.mul(torch.tensor([1,2,3]), torch.tensor([2,3,4]).unsqueeze(1)))
+print(t_bc)
 
 
 
