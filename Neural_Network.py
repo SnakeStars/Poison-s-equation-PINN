@@ -21,7 +21,7 @@ print(f"Using {device} device")
 # Класс нейронной сети
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, hidden_size=20):
+    def __init__(self, hidden_size=32):
         super().__init__()
         self.flatten = nn.Flatten()
         self.tanh_layers_stack = nn.Sequential(
@@ -31,9 +31,7 @@ class NeuralNetwork(nn.Module):
             nn.Tanh(),
             nn.Linear(hidden_size, hidden_size), #2
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), #3
-            nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), #4
+            nn.Linear(hidden_size, hidden_size), #1
             nn.Tanh(),
             nn.Linear(hidden_size, 1),
         )
@@ -44,14 +42,14 @@ class NeuralNetwork(nn.Module):
 model = NeuralNetwork().to(device)
 print(model)
 
-torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
-# model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
+# torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
+model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
 
 #  Задание параметров модели:
 
 Q = [[0, 2], [0, 2]]                    # Borders
-step = 10                               # points in one dim
-EPOH = 1000                             # study iterations
+step = 100                               # points in one dim
+EPOH = 100                             # study iterations
 mode = 1                                # 1 - training, 0 - working on saved data (only weights saved!)
 
 # Создание сетки:
@@ -114,7 +112,7 @@ def pdeLoss(t):
     loss_bc = metric_data(f_bc, g_true)
     loss_pde = metric_data(f, f_true)
 
-    loss = 1e3*loss_bc + loss_pde
+    loss = 0.673*loss_bc + loss_pde
 
     return loss
 
@@ -132,7 +130,7 @@ def train():
         optimizer.step(closure)
         if step % 2 == 0:
             current_loss = closure().item()
-            pbar.set_description("Step: %d | Loss: %.6f" %
+            pbar.set_description("Step: %d | Loss: %.7f" %
                                  (step, current_loss))
             writer.add_scalar('Loss/train', current_loss, step)
 
@@ -155,4 +153,5 @@ if __name__ == "__main__":
     else:
         model.load_state_dict(torch.load('Poison-s-PINN-finish-weights.pth', weights_only=True))
         model.eval()
+        show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy())
 
