@@ -22,8 +22,9 @@ t = torch.cartesian_prod(x, y)
 t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], 
                      t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],
                      t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
-print(t)
+g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  )
 print(t_bc)
+print(g_true)
 
 
 

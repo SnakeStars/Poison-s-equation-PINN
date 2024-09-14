@@ -66,7 +66,7 @@ def pdeLoss(t):
     g_true = torch.mul(torch.tensor(x), torch.tensor(y).unsqueeze(1))
     t_bc = torch.cat(t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], 
                      t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],
-                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])])
+                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]) # finished here
 
     loss_bc = metric_data(x0, x0_true) + metric_data(dx0dt, dx0dt_true.to(device))
     loss_pde = metric_data(f1, torch.zeros_like(f1))
