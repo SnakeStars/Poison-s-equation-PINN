@@ -43,6 +43,33 @@ class NeuralNetwork(nn.Module):
 model = NeuralNetwork().to(device)
 print(model)
 
+# torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
+model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
+
+#  Задание параметров модели:
+
+Q = [[0, 2], [0, 2]]                    # Borders
+step = 10                               # points in one dim
+EPOH = 1000                             # study iterations
+
+# Создание сетки:
+
+x = torch.linspace(Q[0][0], Q[0][1], step)
+x.requires_grad = True
+y = torch.linspace(Q[1][0], Q[1][1], step)
+y.requires_grad = True
+t = torch.cartesian_prod(x, y)
+
+# Создание шкалы загрузки:
+
+pbar = tqdm(range(EPOH), desc='Training Progress')
+
+# Оптимизатор и функция подсчета ошибки
+
+metric_data = nn.MSELoss()
+writer = SummaryWriter()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+
 # Уравнение функции
 
 def pde(out, fx, fy):
@@ -80,9 +107,9 @@ def pdeLoss(t):
 
     return loss
 
+# Функция тренировки нейросети
 
 def train():
-
 
     for step in pbar:
         def closure():
@@ -101,42 +128,5 @@ def train():
 
 
 
-if __name__ == "__main__":
-
-    #  Задание параметров модели:
-
-    Q = [[0, 2], [0, 2]]                    # Borders
-    step = 10                               # points in one dim
-    EPOH = 1000                             # study iterations
-
-    def f(x, y):
-        return (-2) * (torch.pi ** 2) * torch.sin(torch.pi * x) * torch.sin(torch.pi * y)
-    
-
-    def g(x,y):
-        return torch.sin(torch.pi * x) * torch.sin(torch.pi * y)
-    
-    def F(x,y, Q, res):
-        return g(x,y) + (x - Q[0][0])*(Q[0][1] - x)*(y - Q[1][0])*(Q[1][1] - y) * res
-
-
-    # Создание сетки:
-
-    x = torch.linspace(Q[0][0], Q[0][1], step)
-    x.requires_grad = True
-    y = torch.linspace(Q[1][0], Q[1][1], step)
-    y.requires_grad = True
-    t = torch.cartesian_prod(x, y)
-
-
-    # Создание шкалы загрузки:
-
-    pbar = tqdm(range(EPOH), desc='Training Progress')
-
-
-    # Оптимизатор и функция подсчета ошибки
-
-    metric_data = nn.MSELoss()
-    writer = SummaryWriter()
-    optimizer = torch.optim.adam(model.parameters(), lr=0.1)
+#if __name__ == "__main__":
 
