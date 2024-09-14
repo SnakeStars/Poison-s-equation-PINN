@@ -55,11 +55,20 @@ mode = 1                                # 1 - training, 0 - working on saved dat
 
 # Создание сетки:
 
-x = torch.linspace(Q[0][0], Q[0][1], step)
+dat = []
+for i in torch.linspace(Q[1][0], Q[1][1], step):
+    dat.append(torch.linspace(Q[0][0], Q[0][1], step))
+x = torch.cat(dat).unsqueeze(1).to(device)
 x.requires_grad = True
-y = torch.linspace(Q[1][0], Q[1][1], step)
+dat = []
+for i in torch.linspace(Q[0][0], Q[0][1], step):
+    data = []
+    for j in torch.linspace(Q[1][0], Q[1][1], step):
+        data.append(i)
+    dat.append(torch.tensor(data))
+y = torch.cat(dat).unsqueeze(1).to(device)
 y.requires_grad = True
-t = torch.cartesian_prod(x, y)
+t = torch.cat([x,y],dim=-1)
 
 # Создание шкалы загрузки:
 
@@ -92,9 +101,9 @@ def pdeLoss(t):
     out = model(t).to(device)
     f = pde(out, x, y)
 
-    t_bc = torch.cat(t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], 
+    t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], 
                      t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],
-                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])])
+                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
     
     f_bc = model(t_bc).to(device)
     g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  )
