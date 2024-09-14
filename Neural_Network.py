@@ -62,14 +62,19 @@ def pde(out, fx, fy):
 
 def pdeLoss(t):
     out = model(t).to(device)
-    f1 = pde(out, x, y)
-    g_true = torch.mul(torch.tensor(x), torch.tensor(y).unsqueeze(1))
+    f = pde(out, x, y)
+
     t_bc = torch.cat(t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], 
                      t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],
-                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]) # finished here
+                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])])
+    
+    f_bc = model(t_bc).to(device)
+    g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  )
+    f_true = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) ,
+                                                               torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  )))
 
-    loss_bc = metric_data(x0, x0_true) + metric_data(dx0dt, dx0dt_true.to(device))
-    loss_pde = metric_data(f1, torch.zeros_like(f1))
+    loss_bc = metric_data(f_bc, g_true)
+    loss_pde = metric_data(f, f_true)
 
     loss = loss_bc + loss_pde
 
