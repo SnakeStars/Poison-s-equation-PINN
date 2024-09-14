@@ -1,4 +1,6 @@
 import torch
+from matplotlib import *
+import numpy as np
 
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 4                                # points in one dim
@@ -11,22 +13,31 @@ device = (
     if torch.backends.mps.is_available()
     else "cpu"
 )
-dat = []
-for i in torch.linspace(Q[1][0], Q[1][1], step):
-    dat.append(torch.linspace(Q[0][0], Q[0][1], step))
-x = torch.cat(dat).unsqueeze(1).to(device)
-x.requires_grad = True
-dat = []
-for i in torch.linspace(Q[0][0], Q[0][1], step):
-    data = []
-    for j in torch.linspace(Q[1][0], Q[1][1], step):
-        data.append(i)
-    dat.append(torch.tensor(data, dtype=float))
-y = torch.cat(dat).unsqueeze(1).to(device)
-y.requires_grad = True
-t = torch.cat([x,y],dim=-1)
-print(t)
-print(torch.autograd.grad(t, x, torch.ones_like(torch.empty(16,2).to(device)), create_graph=True, retain_graph=True)[0].squeeze())
+# dat = []
+# for i in torch.linspace(Q[1][0], Q[1][1], step):
+#     dat.append(torch.linspace(Q[0][0], Q[0][1], step))
+# x = torch.cat(dat).unsqueeze(1).to(device)
+# x.requires_grad = True
+# dat = []
+# for i in torch.linspace(Q[0][0], Q[0][1], step):
+#     data = []
+#     for j in torch.linspace(Q[1][0], Q[1][1], step):
+#         data.append(i)
+#     dat.append(torch.tensor(data, dtype=float))
+# y = torch.cat(dat).unsqueeze(1).to(device)
+# y.requires_grad = True
+# t = torch.cat([x,y],dim=-1)
+# print(t)
+# print(torch.autograd.grad(t, x, torch.ones_like(torch.empty(16,2).to(device)), create_graph=True, retain_graph=True)[0].squeeze())
+
+u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+x = np.cos(u)*np.sin(v)
+y = np.sin(u)*np.sin(v)
+z = np.cos(v)
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.plot_surface(x, y, z, cmap='inferno')
+ax.legend()
 
 # step = 4
 # x = torch.tensor([1.,2.,1.,2.]).unsqueeze(1).to(device)

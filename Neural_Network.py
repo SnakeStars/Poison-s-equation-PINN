@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # Выбор ресурса для обучения (автоматический)
 
@@ -20,7 +21,7 @@ print(f"Using {device} device")
 # Класс нейронной сети
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, hidden_size=8):
+    def __init__(self, hidden_size=20):
         super().__init__()
         self.flatten = nn.Flatten()
         self.tanh_layers_stack = nn.Sequential(
@@ -113,7 +114,7 @@ def pdeLoss(t):
     loss_bc = metric_data(f_bc, g_true)
     loss_pde = metric_data(f, f_true)
 
-    loss = loss_bc + loss_pde
+    loss = 1e3*loss_bc + loss_pde
 
     return loss
 
@@ -135,6 +136,14 @@ def train():
                                  (step, current_loss))
             writer.add_scalar('Loss/train', current_loss, step)
 
+def show(x, y, z):
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.scatter(x,y,z, s=10)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    plt.show()
 
 
 
@@ -142,6 +151,7 @@ if __name__ == "__main__":
     if mode:
         train()
         torch.save(model.state_dict(), 'Poison-s-PINN-finish-weights.pth')
+        show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy())
     else:
         model.load_state_dict(torch.load('Poison-s-PINN-finish-weights.pth', weights_only=True))
         model.eval()
