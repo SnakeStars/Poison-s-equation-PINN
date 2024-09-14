@@ -38,19 +38,20 @@ class NeuralNetwork(nn.Module):
         )
 
     def forward(self, dat):
-        return self.tanh_layers_stack(self.dat)
+        return self.tanh_layers_stack(dat)
     
 model = NeuralNetwork().to(device)
 print(model)
 
-# torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
-model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
+torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
+# model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
 
 #  Задание параметров модели:
 
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 10                               # points in one dim
 EPOH = 1000                             # study iterations
+mode = 1                                # 1 - training, 0 - working on saved data (only weights saved!)
 
 # Создание сетки:
 
@@ -128,5 +129,11 @@ def train():
 
 
 
-#if __name__ == "__main__":
+if __name__ == "__main__":
+    if mode:
+        train()
+        torch.save(model.state_dict(), 'Poison-s-PINN-finish-weights.pth')
+    else:
+        model.load_state_dict(torch.load('Poison-s-PINN-finish-weights.pth', weights_only=True))
+        model.eval()
 
