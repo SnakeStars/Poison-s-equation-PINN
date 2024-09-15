@@ -21,7 +21,7 @@ print(f"Using {device} device")
 # Класс нейронной сети
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, hidden_size=32):
+    def __init__(self, hidden_size=16):
         super().__init__()
         self.flatten = nn.Flatten()
         self.tanh_layers_stack = nn.Sequential(
@@ -30,6 +30,12 @@ class NeuralNetwork(nn.Module):
             nn.Linear(hidden_size, hidden_size), #1
             nn.Tanh(),
             nn.Linear(hidden_size, hidden_size), #2
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size), #1
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size), #2
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size), #1
             nn.Tanh(),
             nn.Linear(hidden_size, hidden_size), #1
             nn.Tanh(),
@@ -42,14 +48,14 @@ class NeuralNetwork(nn.Module):
 model = NeuralNetwork().to(device)
 print(model)
 
-# torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
-model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
+torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
+#model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
 
 #  Задание параметров модели:
 
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 100                               # points in one dim
-EPOH = 100                             # study iterations
+EPOH = 1000                             # study iterations
 mode = 1                                # 1 - training, 0 - working on saved data (only weights saved!)
 
 # Создание сетки:
@@ -58,7 +64,6 @@ dat = []
 for i in torch.linspace(Q[1][0], Q[1][1], step):
     dat.append(torch.linspace(Q[0][0], Q[0][1], step))
 x = torch.cat(dat).unsqueeze(1).to(device)
-x.requires_grad = True
 dat = []
 for i in torch.linspace(Q[0][0], Q[0][1], step):
     data = []
@@ -66,9 +71,13 @@ for i in torch.linspace(Q[0][0], Q[0][1], step):
         data.append(i)
     dat.append(torch.tensor(data))
 y = torch.cat(dat).unsqueeze(1).to(device)
-y.requires_grad = True
 t = torch.cat([x,y],dim=-1)
 
+x_in = x[(x[:, 0] != Q[0][0]) & (x[:, 0] != Q[0][1]) & (y[:, 0] != Q[1][0]) & (y[:, 0] != Q[1][1])]
+x_in.requires_grad = True
+y_in = y[(y[:, 0] != Q[1][0]) & (y[:, 0] != Q[1][1]) & (x[:, 0] != Q[0][0]) & (x[:, 0] != Q[0][1])]
+y_in.requires_grad = True
+t_in = torch.cat([x_in,y_in],dim=-1)
 # Создание шкалы загрузки:
 
 pbar = tqdm(range(EPOH), desc='Training Progress')
@@ -77,7 +86,7 @@ pbar = tqdm(range(EPOH), desc='Training Progress')
 
 metric_data = nn.MSELoss()
 writer = SummaryWriter()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
 
 # Уравнение функции
 
@@ -97,22 +106,18 @@ def pde(out, fx, fy):
 # Уравнение ошибки
 
 def pdeLoss(t):
-    out = model(t).to(device)
-    f = pde(out, x, y)
+    out = model(t_in).to(device)
+    f = pde(out, x_in, y_in)
 
-    t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], 
-                     t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],
-                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
+    t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
     
     f_bc = model(t_bc).to(device)
-    g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  )
-    f_true = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) ,
-                                                               torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  )))
+    g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  ).unsqueeze(1)
+    f_true = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,t_in[:, 0].clone())) ,torch.sin(torch.mul(torch.pi,t_in[:, 1].clone()))  ))).unsqueeze(1)
 
     loss_bc = metric_data(f_bc, g_true)
     loss_pde = metric_data(f, f_true)
-
-    loss = 0.673*loss_bc + loss_pde
+    loss = loss_pde + 3*loss_bc
 
     return loss
 

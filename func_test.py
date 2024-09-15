@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 Q = [[0, 2], [0, 2]]                    # Borders
-step = 4                                # points in one dim
+step = 5                                # points in one dim
 EPOH = 1000                             # study iterations
 
 device = (
@@ -33,7 +33,6 @@ dat = []
 for i in torch.linspace(Q[1][0], Q[1][1], step):
     dat.append(torch.linspace(Q[0][0], Q[0][1], step))
 x = torch.cat(dat).unsqueeze(1).to(device)
-x.requires_grad = True
 dat = []
 for i in torch.linspace(Q[0][0], Q[0][1], step):
     data = []
@@ -41,15 +40,16 @@ for i in torch.linspace(Q[0][0], Q[0][1], step):
         data.append(i)
     dat.append(torch.tensor(data))
 y = torch.cat(dat).unsqueeze(1).to(device)
-y.requires_grad = True
 t = torch.cat([x,y],dim=-1)
 
-t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], 
-                     t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],
-                     t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
-g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  )
-print(t_bc[:, 0].clone())
-print(torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())))
+x_in = x[(x[:, 0] != Q[0][0]) & (x[:, 0] != Q[0][1]) & (y[:, 0] != Q[1][0]) & (y[:, 0] != Q[1][1])]
+x_in.requires_grad = True
+y_in = y[(y[:, 0] != Q[1][0]) & (y[:, 0] != Q[1][1]) & (x[:, 0] != Q[0][0]) & (x[:, 0] != Q[0][1])]
+y_in.requires_grad = True
+t_in = torch.cat([x_in,y_in],dim=-1)
+f = torch.mul(t_in[:,0], 2)
+print(t_in)
+print(torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,t_in[:, 0].clone())) ,torch.sin(torch.mul(torch.pi,t_in[:, 1].clone()))  ))))
 
 # step = 4
 # x = torch.tensor([1.,2.,1.,2.]).unsqueeze(1).to(device)
