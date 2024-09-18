@@ -52,7 +52,7 @@ torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохран
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 150                              # points in one dim
 EPOH = 100                              # study iterations
-mode = 1                                # 1 - training, 0 - working on saved data (only weights saved!)
+mode = 0                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
 
 # Data
 
@@ -157,10 +157,12 @@ def show(x, y, z, arr, xlab):
 if __name__ == "__main__":
     if mode:
         train()
+        np.savetxt("loss.csv",lossArr, delimiter=",")
         torch.save(model.state_dict(), 'Poison-s-PINN-finish-weights.pth')
         show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy(),lossArr,torch.arange(0,len(lossArr),1).cpu().numpy())
     else:
         model.load_state_dict(torch.load('Poison-s-PINN-finish-weights.pth', weights_only=True))
         model.eval()
+        lossArr = np.genfromtxt("loss.csv", delimiter=",")
         show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy(),lossArr,torch.arange(0,len(lossArr),1).cpu().numpy())
 
