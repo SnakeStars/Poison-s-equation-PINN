@@ -6,6 +6,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from matplotlib import cm
+import numpy as np
 
 # Выбор ресурса для обучения (автоматический)
 
@@ -33,12 +35,6 @@ class NeuralNetwork(nn.Module):
             nn.Tanh(),
             nn.Linear(hidden_size, hidden_size), #1
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), #2
-            nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), #1
-            nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), #1
-            nn.Tanh(),
             nn.Linear(hidden_size, 1),
         )
 
@@ -54,9 +50,13 @@ torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохран
 #  Задание параметров модели:
 
 Q = [[0, 2], [0, 2]]                    # Borders
-step = 100                               # points in one dim
-EPOH = 1000                             # study iterations
+step = 150                              # points in one dim
+EPOH = 100                              # study iterations
 mode = 1                                # 1 - training, 0 - working on saved data (only weights saved!)
+
+# Data
+
+lossArr = []
 
 # Создание сетки:
 
@@ -115,9 +115,11 @@ def pdeLoss(t):
     g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  ).unsqueeze(1)
     f_true = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,t_in[:, 0].clone())) ,torch.sin(torch.mul(torch.pi,t_in[:, 1].clone()))  ))).unsqueeze(1)
 
+    
     loss_bc = metric_data(f_bc, g_true)
     loss_pde = metric_data(f, f_true)
     loss = loss_pde + 3*loss_bc
+    lossArr.append(np.log10(loss.item()))
 
     return loss
 
@@ -139,13 +141,15 @@ def train():
                                  (step, current_loss))
             writer.add_scalar('Loss/train', current_loss, step)
 
-def show(x, y, z):
+def show(x, y, z, arr, xlab):
     fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    ax.scatter(x,y,z, s=10)
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
+    ax1 = fig.add_subplot(1,2,1,projection='3d')
+    ax1.scatter(x,y,z,c=z, cmap='viridis',s=5)
+    ax1.set_xlabel('x')
+    ax1.set_ylabel('y')
+    ax1.set_zlabel('z')
+    ax2 = fig.add_subplot(1,2,2)
+    ax2.plot(xlab, arr)
     plt.show()
 
 
@@ -154,9 +158,9 @@ if __name__ == "__main__":
     if mode:
         train()
         torch.save(model.state_dict(), 'Poison-s-PINN-finish-weights.pth')
-        show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy())
+        show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy(),lossArr,torch.arange(0,len(lossArr),1).cpu().numpy())
     else:
         model.load_state_dict(torch.load('Poison-s-PINN-finish-weights.pth', weights_only=True))
         model.eval()
-        show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy())
+        show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy(),lossArr,torch.arange(0,len(lossArr),1).cpu().numpy())
 
