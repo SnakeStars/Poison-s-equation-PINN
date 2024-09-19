@@ -6,6 +6,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib import cm
 import numpy as np
 
@@ -52,11 +53,14 @@ torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохран
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 150                              # points in one dim
 EPOH = 100                              # study iterations
-mode = 0                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
+mode = 1                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
+lambd = 3
 
 # Data
 
 lossArr = []
+lossPdeArr = []
+lossBcArr = []
 
 # Создание сетки:
 
@@ -118,8 +122,10 @@ def pdeLoss(t):
     
     loss_bc = metric_data(f_bc, g_true)
     loss_pde = metric_data(f, f_true)
-    loss = loss_pde + 3*loss_bc
-    lossArr.append(np.log10(loss.item()))
+    loss = loss_pde + lambd*loss_bc
+    lossArr.append(loss.item())
+    lossPdeArr.append(loss_pde.item())
+    lossBcArr.append(loss_bc.item())
 
     return loss
 
@@ -141,15 +147,42 @@ def train():
                                  (step, current_loss))
             writer.add_scalar('Loss/train', current_loss, step)
 
-def show(x, y, z, arr, xlab):
-    fig = plt.figure()
-    ax1 = fig.add_subplot(1,2,1,projection='3d')
-    ax1.scatter(x,y,z,c=z, cmap='viridis',s=5)
+def show(x, y, z, arr, arr_pde, arr_bc, xlab):
+    plt.style.use('_mpl-gallery')
+    X, Y = np.meshgrid(np.squeeze(x), np.squeeze(x))
+    Z = np.reshape(z, (len(X), len(X)))
+    fig1, ax1 = plt.subplots(subplot_kw={"projection": "3d"})
+    ax1.plot_surface(X,Y,Z, cmap='hot')
     ax1.set_xlabel('x')
     ax1.set_ylabel('y')
     ax1.set_zlabel('z')
-    ax2 = fig.add_subplot(1,2,2)
-    ax2.plot(xlab, arr)
+
+    fig2, ax2 = plt.subplots()
+
+    fs = 12
+
+    ax2.plot(arr_pde, label=r'Pde')
+    ax2.plot(arr_bc, label=r'BC')
+    ax2.plot(arr, label=r'Loss')
+
+    ax=plt.gca()
+    ax.set_yscale('log')
+    plt.grid(which='major', linestyle='-')
+    plt.grid(which='minor', linestyle='--')
+    plt.xlim(0)
+    plt.ylim(1e-5, 1e2)
+    plt.xticks(fontsize=fs)
+    plt.yticks(fontsize=fs)
+    ax.tick_params(axis='both',direction='in')
+
+    plt.legend(fontsize=fs)
+    plt.xlabel('Iteration count', fontsize=fs)
+    plt.ylabel('Loss', fontsize=fs)
+    plt.title('Loss while training')
+    plt.tight_layout()
+    plt.savefig('history_harm.png')
+
+
     plt.show()
 
 
@@ -158,11 +191,15 @@ if __name__ == "__main__":
     if mode:
         train()
         np.savetxt("loss.csv",lossArr, delimiter=",")
+        np.savetxt("loss_pde.csv",lossPdeArr, delimiter=",")
+        np.savetxt("loss_bc.csv",lossBcArr, delimiter=",")
         torch.save(model.state_dict(), 'Poison-s-PINN-finish-weights.pth')
-        show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy(),lossArr,torch.arange(0,len(lossArr),1).cpu().numpy())
+        show(x.cpu().detach().numpy()[0:step],y.cpu().detach().numpy()[0:step],model(t).to(device).cpu().detach().numpy(),lossArr, lossPdeArr, lossBcArr, torch.arange(0,len(lossArr),1).cpu().numpy())
     else:
         model.load_state_dict(torch.load('Poison-s-PINN-finish-weights.pth', weights_only=True))
         model.eval()
         lossArr = np.genfromtxt("loss.csv", delimiter=",")
-        show(x.cpu().detach().numpy(),y.cpu().detach().numpy(),model(t).to(device).cpu().detach().numpy(),lossArr,torch.arange(0,len(lossArr),1).cpu().numpy())
+        lossPdeArr = np.genfromtxt("loss_pde.csv", delimiter=",")
+        lossBcArr = np.genfromtxt("loss_bc.csv", delimiter=",")
+        show(x.cpu().detach().numpy()[0:step],y.cpu().detach().numpy()[0:step],model(t).to(device).cpu().detach().numpy(),lossArr, lossPdeArr, lossBcArr,torch.arange(0,len(lossArr),1).cpu().numpy())
 

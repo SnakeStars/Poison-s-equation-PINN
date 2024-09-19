@@ -1,18 +1,26 @@
-# Import Library
-
-
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Define Data
+from matplotlib import cm
 
-x = np.linspace(0, 10, 100)
-y = np.sin(x)
+plt.style.use('_mpl-gallery')
 
-# Set color map
+# Make data
+X = [1,2]
+Y = [1,2]
+print(np.meshgrid(X, Y))
+X, Y = np.meshgrid(X, Y)
+R = X + Y
+Z = np.sin(R)
+print(R)
 
-plt.scatter(x, y, c=y, cmap='Set2')
 
-# Display
+# Plot the surface
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+ax.plot_surface(X, Y, Z, vmin=Z.min() * 2, cmap=cm.Blues)
+
+ax.set(xticklabels=[],
+       yticklabels=[],
+       zticklabels=[])
 
 plt.show()
