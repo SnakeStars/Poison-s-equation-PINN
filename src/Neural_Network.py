@@ -151,13 +151,14 @@ def show(x, y, z, arr, arr_pde, arr_bc, xlab):
     plt.style.use('_mpl-gallery')
     X, Y = np.meshgrid(np.squeeze(x), np.squeeze(x))
     Z = np.reshape(z, (len(X), len(X)))
-    fig1, ax1 = plt.subplots(subplot_kw={"projection": "3d"})
+    fig1, ax1 = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(16, 9))
     ax1.plot_surface(X,Y,Z, cmap='hot')
     ax1.set_xlabel('x')
     ax1.set_ylabel('y')
     ax1.set_zlabel('z')
+    # fig1.savefig('main_surface.png')
 
-    fig2, ax2 = plt.subplots()
+    fig2, ax2 = plt.subplots(figsize=(16, 9))
 
     fs = 12
     margins = {                                               # +++                                          
@@ -186,8 +187,7 @@ def show(x, y, z, arr, arr_pde, arr_bc, xlab):
     plt.xlabel('Iteration count', fontsize=fs)
     plt.ylabel('Loss', fontsize=fs)
     plt.title('Loss while training')
-    #plt.tight_layout()
-    plt.savefig('history_harm.png')
+    # plt.savefig('history_harm.png')
 
 
     plt.show()
