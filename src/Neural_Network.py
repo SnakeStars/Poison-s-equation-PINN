@@ -53,7 +53,7 @@ torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохран
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 150                              # points in one dim
 EPOH = 100                              # study iterations
-mode = 1                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
+mode = 0                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
 lambd = 3
 
 # Data
@@ -160,26 +160,33 @@ def show(x, y, z, arr, arr_pde, arr_bc, xlab):
     fig2, ax2 = plt.subplots()
 
     fs = 12
+    margins = {                                               # +++                                          
+    "left"   : 0.040,
+    "bottom" : 0.060,
+    "right"  : 0.950,
+    "top"    : 0.950   
+    }
+    fig2.subplots_adjust(**margins) 
 
-    ax2.plot(arr_pde, label=r'Pde')
-    ax2.plot(arr_bc, label=r'BC')
-    ax2.plot(arr, label=r'Loss')
+    ax2.plot(arr_pde, label=r'Loss PDE', color="green")
+    ax2.plot(arr_bc, label=r'Loss BC', color="blue")
+    ax2.plot(arr, label=r'Total Loss', color="orange")
 
-    ax=plt.gca()
-    ax.set_yscale('log')
+    ax2=plt.gca()
+    ax2.set_yscale('log')
     plt.grid(which='major', linestyle='-')
     plt.grid(which='minor', linestyle='--')
     plt.xlim(0)
     plt.ylim(1e-5, 1e2)
     plt.xticks(fontsize=fs)
     plt.yticks(fontsize=fs)
-    ax.tick_params(axis='both',direction='in')
+    ax2.tick_params(axis='both',direction='in')
 
     plt.legend(fontsize=fs)
     plt.xlabel('Iteration count', fontsize=fs)
     plt.ylabel('Loss', fontsize=fs)
     plt.title('Loss while training')
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.savefig('history_harm.png')
 
 
