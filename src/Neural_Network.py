@@ -34,8 +34,6 @@ class NeuralNetwork(nn.Module):
             nn.Tanh(),
             nn.Linear(hidden_size, hidden_size), #2
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size), #1
-            nn.Tanh(),
             nn.Linear(hidden_size, 1),
         )
 
@@ -52,7 +50,7 @@ torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохран
 
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 150                              # points in one dim
-EPOH = 100                              # study iterations
+EPOH = 1000                              # study iterations
 mode = 0                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
 lambd = 3
 
@@ -61,6 +59,8 @@ lambd = 3
 lossArr = []
 lossPdeArr = []
 lossBcArr = []
+lossEqual = []
+maxloss = []
 
 # Создание сетки:
 
@@ -107,6 +107,13 @@ def pde(out, fx, fy):
                             retain_graph=True)[0])
     return d2udx2 + d2udy2
 
+# Функция аналитического решения
+
+def equation(x, y):
+    Y,X = torch.meshgrid(x.squeeze(), x.squeeze())
+    #print(torch.meshgrid(x.squeeze(), x.squeeze()))
+    return torch.mul(torch.sin(torch.pi * X),torch.sin(torch.pi * Y)).reshape(-1,1).to(device)
+
 # Уравнение ошибки
 
 def pdeLoss(t):
@@ -115,6 +122,7 @@ def pdeLoss(t):
 
     t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
     
+    f_equal = equation(x_in[0:step-2], y_in[0:step-2])
     f_bc = model(t_bc).to(device)
     g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  ).unsqueeze(1)
     f_true = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,t_in[:, 0].clone())) ,torch.sin(torch.mul(torch.pi,t_in[:, 1].clone()))  ))).unsqueeze(1)
@@ -123,9 +131,16 @@ def pdeLoss(t):
     loss_bc = metric_data(f_bc, g_true)
     loss_pde = metric_data(f, f_true)
     loss = loss_pde + lambd*loss_bc
+    loss_eq = metric_data(out, f_equal)
+    masloss = torch.norm(out - f_equal, p=float('inf'))
+
+    # print(loss_eq)
+
+    lossEqual.append(loss_eq.item())
     lossArr.append(loss.item())
     lossPdeArr.append(loss_pde.item())
     lossBcArr.append(loss_bc.item())
+    maxloss.append(masloss.item())
 
     return loss
 
@@ -147,7 +162,7 @@ def train():
                                  (step, current_loss))
             writer.add_scalar('Loss/train', current_loss, step)
 
-def show(x, y, z, arr, arr_pde, arr_bc, xlab):
+def show(x, y, z, arr, arr_pde, arr_bc, arr_eq, xlab):
     plt.style.use('_mpl-gallery')
     X, Y = np.meshgrid(np.squeeze(x), np.squeeze(x))
     Z = np.reshape(z, (len(X), len(X)))
@@ -156,7 +171,7 @@ def show(x, y, z, arr, arr_pde, arr_bc, xlab):
     ax1.set_xlabel('x')
     ax1.set_ylabel('y')
     ax1.set_zlabel('z')
-    # fig1.savefig('main_surface.png')
+    fig1.savefig('main_surface.png')
 
     fig2, ax2 = plt.subplots(figsize=(16, 9))
 
@@ -172,6 +187,8 @@ def show(x, y, z, arr, arr_pde, arr_bc, xlab):
     ax2.plot(arr_pde, label=r'Loss PDE', color="green")
     ax2.plot(arr_bc, label=r'Loss BC', color="blue")
     ax2.plot(arr, label=r'Total Loss', color="orange")
+    #ax2.plot(arr_eq, label=r'Precise Loss', color="red")
+    ax2.plot(maxloss, label=r'Abs max', color="purple")
 
     ax2=plt.gca()
     ax2.set_yscale('log')
@@ -187,12 +204,8 @@ def show(x, y, z, arr, arr_pde, arr_bc, xlab):
     plt.xlabel('Iteration count', fontsize=fs)
     plt.ylabel('Loss', fontsize=fs)
     plt.title('Loss while training')
-    # plt.savefig('history_harm.png')
-
-
+    plt.savefig('history_harm.png')
     plt.show()
-
-
 
 if __name__ == "__main__":
     if mode:
@@ -200,13 +213,17 @@ if __name__ == "__main__":
         np.savetxt("loss.csv",lossArr, delimiter=",")
         np.savetxt("loss_pde.csv",lossPdeArr, delimiter=",")
         np.savetxt("loss_bc.csv",lossBcArr, delimiter=",")
+        # np.savetxt("precise_loss.csv",lossEqual, delimiter=",")
+        np.savetxt("absolute_max_loss.csv",maxloss, delimiter=",")
         torch.save(model.state_dict(), 'Poison-s-PINN-finish-weights.pth')
-        show(x.cpu().detach().numpy()[0:step],y.cpu().detach().numpy()[0:step],model(t).to(device).cpu().detach().numpy(),lossArr, lossPdeArr, lossBcArr, torch.arange(0,len(lossArr),1).cpu().numpy())
+        show(x.cpu().detach().numpy()[0:step],y.cpu().detach().numpy()[0:step],model(t).to(device).cpu().detach().numpy(),lossArr, lossPdeArr, lossBcArr, lossEqual, torch.arange(0,len(lossArr),1).cpu().numpy())
     else:
         model.load_state_dict(torch.load('Poison-s-PINN-finish-weights.pth', weights_only=True))
         model.eval()
         lossArr = np.genfromtxt("loss.csv", delimiter=",")
         lossPdeArr = np.genfromtxt("loss_pde.csv", delimiter=",")
         lossBcArr = np.genfromtxt("loss_bc.csv", delimiter=",")
-        show(x.cpu().detach().numpy()[0:step],y.cpu().detach().numpy()[0:step],model(t).to(device).cpu().detach().numpy(),lossArr, lossPdeArr, lossBcArr,torch.arange(0,len(lossArr),1).cpu().numpy())
+        # lossEqual = np.genfromtxt("precise_loss.csv", delimiter=",")
+        maxloss = np.genfromtxt("absolute_max_loss.csv", delimiter=",")
+        show(x.cpu().detach().numpy()[0:step],y.cpu().detach().numpy()[0:step],model(t).to(device).cpu().detach().numpy(),lossArr, lossPdeArr, lossBcArr, lossEqual, torch.arange(0,len(lossArr),1).cpu().numpy())
 
