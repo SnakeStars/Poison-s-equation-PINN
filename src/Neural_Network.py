@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib import cm
 import numpy as np
+import optuna
 
 # Выбор ресурса для обучения (автоматический)
 
@@ -39,20 +40,16 @@ class NeuralNetwork(nn.Module):
 
     def forward(self, dat):
         return self.tanh_layers_stack(dat)
-    
-model = NeuralNetwork().to(device)
-print(model)
 
-torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
-#model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
+#torch.save(model.state_dict(), 'Poison-s-PINN-start-weights.pth') # сохранить веса модели
+
 
 #  Задание параметров модели:
 
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 150                              # points in one dim
-EPOH = 1000                              # study iterations
-mode = 0                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
-lambd = 3
+EPOH = 100                              # study iterations
+mode = 1                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
 
 # Data
 
@@ -84,13 +81,7 @@ y_in.requires_grad = True
 t_in = torch.cat([x_in,y_in],dim=-1)
 # Создание шкалы загрузки:
 
-pbar = tqdm(range(EPOH), desc='Training Progress')
-
 # Оптимизатор и функция подсчета ошибки
-
-metric_data = nn.MSELoss()
-writer = SummaryWriter()
-optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
 
 # Уравнение функции
 
@@ -116,51 +107,72 @@ def equation(x, y):
 
 # Уравнение ошибки
 
-def pdeLoss(t):
-    out = model(t_in).to(device)
-    f = pde(out, x_in, y_in)
-
-    t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
-    
-    f_equal = equation(x_in[0:step-2], y_in[0:step-2])
-    f_bc = model(t_bc).to(device)
-    g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  ).unsqueeze(1)
-    f_true = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,t_in[:, 0].clone())) ,torch.sin(torch.mul(torch.pi,t_in[:, 1].clone()))  ))).unsqueeze(1)
-
-    
-    loss_bc = metric_data(f_bc, g_true)
-    loss_pde = metric_data(f, f_true)
-    loss = loss_pde + lambd*loss_bc
-    loss_eq = metric_data(out, f_equal)
-    masloss = torch.norm(out - f_equal, p=float('inf'))
-
-    # print(loss_eq)
-
-    lossEqual.append(loss_eq.item())
-    lossArr.append(loss.item())
-    lossPdeArr.append(loss_pde.item())
-    lossBcArr.append(loss_bc.item())
-    maxloss.append(masloss.item())
-
-    return loss
-
 # Функция тренировки нейросети
 
-def train():
+def objective(trial):
 
-    for step in pbar:
-        def closure():
-            optimizer.zero_grad()
-            loss = pdeLoss(t)
-            loss.backward()
-            return loss
 
-        optimizer.step(closure)
-        if step % 2 == 0:
-            current_loss = closure().item()
-            pbar.set_description("Step: %d | Loss: %.7f" %
-                                 (step, current_loss))
-            writer.add_scalar('Loss/train', current_loss, step)
+    # Обучение
+    model = NeuralNetwork().to(device)
+    metric_data = nn.MSELoss()
+    model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
+    optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
+    def pdeLoss(t, lambd, build):
+        out = model(t_in).to(device)
+        f = pde(out, x_in, y_in)
+
+        t_bc = torch.cat([t[(t[:,1] == Q[1][0]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])], t[(t[:,1] == Q[1][1]) & (t[:,0] != Q[0][0]) & (t[:,0] != Q[0][1])],t[(t[:,0] == Q[0][0])], t[(t[:,0] == Q[0][1])]])
+    
+        f_equal = equation(x_in[0:step-2], y_in[0:step-2])
+        f_bc = model(t_bc).to(device)
+        g_true = torch.mul( torch.sin(torch.mul(torch.pi,t_bc[:, 0].clone())) , torch.sin(torch.mul(torch.pi,t_bc[:, 1].clone()))  ).unsqueeze(1)
+        f_true = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,t_in[:, 0].clone())) ,torch.sin(torch.mul(torch.pi,t_in[:, 1].clone()))  ))).unsqueeze(1)
+
+    
+        loss_bc = metric_data(f_bc, g_true)
+        loss_pde = metric_data(f, f_true)
+        loss = loss_pde + lambd*loss_bc
+        loss_eq = metric_data(out, f_equal)
+        masloss = torch.norm(out - f_equal, p=float('inf'))
+
+        # print(loss_eq)
+        if build:
+            lossEqual.append(loss_eq.item())
+            lossArr.append(loss.item())
+            lossPdeArr.append(loss_pde.item())
+            lossBcArr.append(loss_bc.item())
+            maxloss.append(masloss.item())
+
+        return loss
+
+    def train(lambd, build):
+        pbar = tqdm(range(EPOH), desc='Training Progress')
+        for stepd in pbar:
+            def closure():
+                optimizer.zero_grad()
+                loss = pdeLoss(t, lambd, build)
+                loss.backward()
+                return loss
+
+            los = closure().item()
+            optimizer.step(closure)
+            trial.report(los, stepd)
+
+            if trial.should_prune():
+                pbar.clear()
+                raise optuna.TrialPruned()
+            if stepd % 2 == 0:
+                current_loss = closure().item()
+                pbar.set_description("Lambda: %.4f | Step: %d | Loss: %.7f" %
+                                 (lambd, stepd, current_loss))
+            #writer.add_scalar('Loss/train', current_loss, stepd)
+        pbar.clear()
+        return los
+    
+
+
+    x = trial.suggest_float('x', 0.000001, 1e6)
+    return train(x, 0)
 
 def show(x, y, z, arr, arr_pde, arr_bc, arr_eq, xlab):
     plt.style.use('_mpl-gallery')
@@ -188,7 +200,7 @@ def show(x, y, z, arr, arr_pde, arr_bc, arr_eq, xlab):
     ax2.plot(arr_bc, label=r'Loss BC', color="blue")
     ax2.plot(arr, label=r'Total Loss', color="orange")
     #ax2.plot(arr_eq, label=r'Precise Loss', color="red")
-    ax2.plot(maxloss, label=r'Abs max', color="purple")
+    ax2.plot(maxloss, label=r'Absolute max', color="purple")
 
     ax2=plt.gca()
     ax2.set_yscale('log')
@@ -205,18 +217,34 @@ def show(x, y, z, arr, arr_pde, arr_bc, arr_eq, xlab):
     plt.ylabel('Loss', fontsize=fs)
     plt.title('Loss while training')
     plt.savefig('history_harm.png')
+
+    fig3 = optuna.visualization.plot_optimization_history(study)
+    show(fig3)
+
     plt.show()
 
 if __name__ == "__main__":
     if mode:
-        train()
-        np.savetxt("loss.csv",lossArr, delimiter=",")
-        np.savetxt("loss_pde.csv",lossPdeArr, delimiter=",")
-        np.savetxt("loss_bc.csv",lossBcArr, delimiter=",")
-        # np.savetxt("precise_loss.csv",lossEqual, delimiter=",")
-        np.savetxt("absolute_max_loss.csv",maxloss, delimiter=",")
-        torch.save(model.state_dict(), 'Poison-s-PINN-finish-weights.pth')
-        show(x.cpu().detach().numpy()[0:step],y.cpu().detach().numpy()[0:step],model(t).to(device).cpu().detach().numpy(),lossArr, lossPdeArr, lossBcArr, lossEqual, torch.arange(0,len(lossArr),1).cpu().numpy())
+        # train()
+        study = optuna.create_study(
+            direction="minimize",
+            pruner=optuna.pruners.MedianPruner(
+                n_startup_trials=3, n_warmup_steps=10, interval_steps=3
+                ),
+                )
+        study.optimize(objective, n_trials=6)
+
+        ax = optuna.visualization.matplotlib.plot_intermediate_values(study)
+        ax.set_yscale('log')
+        plt.xlim(0,100)
+        plt.show()
+        # np.savetxt("loss.csv",lossArr, delimiter=",")
+        # np.savetxt("loss_pde.csv",lossPdeArr, delimiter=",")
+        # np.savetxt("loss_bc.csv",lossBcArr, delimiter=",")
+        # # np.savetxt("precise_loss.csv",lossEqual, delimiter=",")
+        # np.savetxt("absolute_max_loss.csv",maxloss, delimiter=",")
+        # torch.save(model.state_dict(), 'Poison-s-PINN-finish-weights.pth')
+        # show(x.cpu().detach().numpy()[0:step],y.cpu().detach().numpy()[0:step],model(t).to(device).cpu().detach().numpy(),lossArr, lossPdeArr, lossBcArr, lossEqual, torch.arange(0,len(lossArr),1).cpu().numpy())
     else:
         model.load_state_dict(torch.load('Poison-s-PINN-finish-weights.pth', weights_only=True))
         model.eval()
