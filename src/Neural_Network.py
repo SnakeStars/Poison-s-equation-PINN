@@ -231,10 +231,10 @@ if __name__ == "__main__":
         study = optuna.create_study(
             direction="minimize",
             pruner=optuna.pruners.MedianPruner(
-                n_startup_trials=3, n_warmup_steps=10, interval_steps=3
+                n_startup_trials=10, n_warmup_steps=10, interval_steps=3
                 ),
                 )
-        study.optimize(objective, n_trials=1)
+        study.optimize(objective, n_trials=200)
 
         ax1 = optuna.visualization.matplotlib.plot_intermediate_values(study)
         ax2 = optuna.visualization.matplotlib.plot_intermediate_values(study)
