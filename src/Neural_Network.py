@@ -48,7 +48,7 @@ class NeuralNetwork(nn.Module):
 
 Q = [[0, 2], [0, 2]]                    # Borders
 step = 150                              # points in one dim
-EPOH = 100                              # study iterations
+EPOH = 2000                              # study iterations
 mode = 1                                # 1 - training, 0 - working on saved data (only weights and loss history saved!)
 
 # Data
@@ -58,6 +58,7 @@ lossPdeArr = []
 lossBcArr = []
 lossEqual = []
 maxloss = []
+global_model = NeuralNetwork()
 
 # Создание сетки:
 
@@ -114,6 +115,7 @@ def objective(trial):
 
     # Обучение
     model = NeuralNetwork().to(device)
+    global_model = model
     metric_data = nn.MSELoss()
     model.load_state_dict(torch.load('Poison-s-PINN-start-weights.pth', weights_only=True)) # загрузить веса модели
     optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
@@ -146,7 +148,7 @@ def objective(trial):
         return loss
 
     def train(lambd, build):
-        pbar = tqdm(range(EPOH), desc='Training Progress')
+        pbar = tqdm(range(EPOH),desc='Training Progress')
         for stepd in pbar:
             def closure():
                 optimizer.zero_grad()
@@ -171,7 +173,7 @@ def objective(trial):
     
 
 
-    x = trial.suggest_float('x', 0.000001, 1e6)
+    x = trial.suggest_float('lambda', 1e-6, 1e6, log=True)
     return train(x, 0)
 
 def show(x, y, z, arr, arr_pde, arr_bc, arr_eq, xlab):
@@ -232,11 +234,49 @@ if __name__ == "__main__":
                 n_startup_trials=3, n_warmup_steps=10, interval_steps=3
                 ),
                 )
-        study.optimize(objective, n_trials=6)
+        study.optimize(objective, n_trials=1)
 
-        ax = optuna.visualization.matplotlib.plot_intermediate_values(study)
-        ax.set_yscale('log')
-        plt.xlim(0,100)
+        ax1 = optuna.visualization.matplotlib.plot_intermediate_values(study)
+        ax2 = optuna.visualization.matplotlib.plot_intermediate_values(study)
+        ax3 = optuna.visualization.matplotlib.plot_intermediate_values(study)
+        ax4 = optuna.visualization.matplotlib.plot_optimization_history(study,target_name='loss')
+        plt.tight_layout()
+
+        ax1.set_yscale('log')
+        ax1.set_xlim(-5,100)
+        ax1.set_title("Hyperparameter selection")
+        ax1.set_xlabel("EPOH")
+        ax1.set_ylabel("Loss")
+
+        ax2.set_yscale('log')
+        ax2.set_xlim(EPOH - 100,EPOH+5)
+        ax2.set_title("Hyperparameter selection")
+        ax2.set_xlabel("EPOH")
+        ax2.set_ylabel("Loss")
+
+        ax3.set_yscale('log')
+        ax3.set_title("Hyperparameter selection")
+        ax3.set_xlabel("EPOH")
+        ax3.set_ylabel("Loss")
+
+        ax4.set_yscale('log')
+        ax4.set_title("Hyperparameter selection")
+        ax4.set_ylabel("Loss")
+
+        ax1.get_figure().set_size_inches(16, 9)
+        ax2.get_figure().set_size_inches(16, 9)
+        ax3.get_figure().set_size_inches(16, 9)
+        ax4.get_figure().set_size_inches(16, 9)
+
+        ax1.get_figure().savefig('Losses_begin.png')
+        ax2.get_figure().savefig('Losses_end.png')
+        ax3.get_figure().savefig('Losses_total.png')
+        ax4.get_figure().savefig('history_losses.png')
+
+        f = open("Best value.txt", "w")
+        f.write(str(study.best_params["lambda"]))
+        f.close()
+
         plt.show()
         # np.savetxt("loss.csv",lossArr, delimiter=",")
         # np.savetxt("loss_pde.csv",lossPdeArr, delimiter=",")
