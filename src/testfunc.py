@@ -1,17 +1,3 @@
-import os
-import torch
-torch.autograd.set_detect_anomaly(True)
-from torch import nn
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
-from torchvision import datasets, transforms
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-import matplotlib
-from matplotlib import cm
-import numpy as np
-import optuna
-
 # Импортируем библиотеку PyTorch
 import torch
 
@@ -51,3 +37,27 @@ interior_points = torch.stack([X[mask].flatten(), Y[mask].flatten()], dim=1)
 # Аналогично создаем тензор с граничными точками
 # ~mask инвертирует маску, выбирая граничные точки
 boundary_points = torch.stack([X[~mask].flatten(), Y[~mask].flatten()], dim=1)
+
+
+
+
+
+# ----------------------------------------------------------------------
+
+
+
+
+interior_points.requires_grad = True
+
+f = interior_points * 2 + 1
+
+dudx = torch.autograd.grad(f, interior_points, torch.ones_like(interior_points), create_graph=True, retain_graph=True)[0]
+
+mask = torch.zeros_like(dudx, dtype=bool)
+
+mask[:, 0] = True
+
+print(dudx[mask])
+
+
+
