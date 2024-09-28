@@ -1,5 +1,7 @@
 import os
 import torch
+
+import torch.share
 torch.autograd.set_detect_anomaly(True)
 from torch import nn
 from torch.utils.data import DataLoader
@@ -54,13 +56,30 @@ mask[1:-1, 1:-1] = True
 # X[mask] выбирает все точки, где mask == True
 # flatten() преобразует результат в 1D тензор
 # stack() объединяет координаты X и Y в один 2D тензор
-interior_points = torch.stack([X[mask].flatten(), Y[mask].flatten()], dim=1)
+interior_X = X[mask].flatten()
+interior_Y = Y[mask].flatten()
+
+interior_X.requires_grad = True
+interior_Y.requires_grad = True
+
+interior_points = torch.stack([interior_X, interior_Y], dim=1)
+
+# Присвоение requres_grad всем координатам точек тензора
 
 # Аналогично создаем тензор с граничными точками
 # ~mask инвертирует маску, выбирая граничные точки
-boundary_points = torch.stack([X[~mask].flatten(), Y[~mask].flatten()], dim=1)
+boundary_X = X[~mask].flatten()
+boundary_Y = Y[~mask].flatten()
 
-all_points = torch.stack([X.flatten(), Y.flatten()], dim=1)
+boundary_X.requires_grad = True
+boundary_Y.requires_grad = True
+
+boundary_points = torch.stack([boundary_X, boundary_Y], dim=1)
+
+all_the_X = X.flatten()
+all_the_Y = Y.flatten()
+
+all_points = torch.stack([all_the_X, all_the_Y], dim=1)
 
 class simpleModel(nn.Module):
   def __init__(self,
@@ -81,21 +100,14 @@ class simpleModel(nn.Module):
 
 def pde(out, t):
 
-    dudt = torch.autograd.grad(out, t, torch.ones_like(t), create_graph=True, retain_graph=True)[0]
+    dudt = torch.autograd.grad(out, [interior_X, interior_Y], grad_outputs=torch.ones_like(out), create_graph=True, retain_graph=True, allow_unused=True)
 
-    d2udt2 = torch.autograd.grad(dudt, t, torch.ones_like(t), create_graph=True, retain_graph=True)[0]
+    dudx = dudt[0]
 
-    x_mask = torch.zeros_like(d2udt2, dtype=bool)
-
-    x_mask[:, 0] = True
-
-    x_result = d2udt2[mask]
-
-    y_mask = torch.zeros_like(d2udt2, dtype=bool)
-
-    y_mask[:, 1] = True
-
-    y_result = d2udt2[y_mask]
+    dudy = dudt[1]
+    print(dudt)
+    x_result = torch.autograd.grad(dudx, interior_X, grad_outputs=torch.ones_like(dudx),create_graph=True, retain_graph=True, allow_unused=True)[0]
+    y_result = torch.autograd.grad(dudy, interior_Y, grad_outputs=torch.ones_like(dudy), create_graph=True, retain_graph=True, allow_unused=True)[0]
 
     return x_result + y_result
 
@@ -128,7 +140,6 @@ def train(model, lambd):
                 loss.backward()
                 return loss
 
-            los = closure().item()
             optimizer.step(closure)
             if stepd % 2 == 0:
                 current_loss = closure().item()

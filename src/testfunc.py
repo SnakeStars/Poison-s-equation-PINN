@@ -38,15 +38,29 @@ interior_points = torch.stack([X[mask].flatten(), Y[mask].flatten()], dim=1)
 # ~mask инвертирует маску, выбирая граничные точки
 boundary_points = torch.stack([X[~mask].flatten(), Y[~mask].flatten()], dim=1)
 
-f = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,boundary_points[:, 0])) ,torch.sin(torch.mul(torch.pi,boundary_points[:, 1]))  ))).unsqueeze(1)
+f = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,interior_points[:, 0])) ,torch.sin(torch.mul(torch.pi,interior_points[:, 1]))  ))).unsqueeze(1)
 
-print(f)
+print(interior_points)
 
 
 
 
 # ----------------------------------------------------------------------
 
+
+
+
+interior_points.requires_grad = True
+
+f = interior_points * 2 + 1
+
+dudx = torch.autograd.grad(f, interior_points, torch.ones_like(interior_points), create_graph=True, retain_graph=True)[0]
+
+mask = torch.zeros_like(dudx, dtype=bool)
+
+mask[:, 0] = True
+
+print(dudx)
 
 
 
