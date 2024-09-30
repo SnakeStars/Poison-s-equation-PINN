@@ -18,6 +18,7 @@ import optuna
 # -----------------------------------
 EPOH = 100
 # -----------------------------------
+equalLoss = []
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -113,6 +114,9 @@ def pde(out, t, tensor_X, tensor_Y):
 
     return x_result + y_result
 
+def equal_f():
+    return torch.mul(torch.sin(torch.pi * all_the_X),torch.sin(torch.pi * all_the_Y)).to(device)
+
 def pdeLoss(model, lambd):
    
    out_inside = model(interior_points).to(device)
@@ -124,14 +128,13 @@ def pdeLoss(model, lambd):
 
    g = torch.zeros_like(out_border)
    f_inside = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,interior_points[:, 0])) ,torch.sin(torch.mul(torch.pi,interior_points[:, 1]))  )))
-   #print(u_inside.shape)
 
    loss_PDE = metric_data(u_inside, f_inside)
    loss_BC = metric_data(out_border, g)
    loss = loss_PDE +loss_BC
    return loss
 
-def train(model, lambd):
+def train(model, lambd, trial=None):
         pbar = tqdm(range(EPOH),desc='Training Progress')
         optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
         for step in pbar:
@@ -140,6 +143,12 @@ def train(model, lambd):
                 loss = pdeLoss(model, lambd)
                 loss.backward()
                 return loss
+            
+            equal_loss = torch.norm(equal_f() - model(all_points).to(device), p=float('inf')).item()
+            equalLoss.append(equal_loss)
+            if trial != None:
+
+                trial.report
 
             optimizer.step(closure)
             if step % 2 == 0:
@@ -148,6 +157,11 @@ def train(model, lambd):
                                  (step, current_loss))
 
         pbar.clear()
+
+def objective(trial):
+    neural_model = simpleModel().to(device)
+    train(neural_model, 1)
+
 def show(z):
     plt.style.use('_mpl-gallery')
     Z = np.reshape(z, (len(X), len(X)))
@@ -156,10 +170,25 @@ def show(z):
     ax1.set_xlabel('x')
     ax1.set_ylabel('y')
     ax1.set_zlabel('z')
+    fig2, ax2 = plt.subplots()
+
+    fs = 12
+    margins = {                                               # +++                                          
+    "left"   : 0.040,
+    "bottom" : 0.060,
+    "right"  : 0.950,
+    "top"    : 0.950   
+    }
+    fig2.subplots_adjust(**margins) 
+
+    ax2=plt.gca()
+    ax2.plot(equalLoss)
+    ax2.set_yscale('log')
 
 
 if __name__ == "__main__":
     neural_model = simpleModel().to(device)
     train(neural_model, 1)
     show(neural_model(all_points).to(device).cpu().detach().numpy())
+    print(equal_f()[510])
     plt.show()

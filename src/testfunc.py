@@ -1,5 +1,16 @@
-# Импортируем библиотеку PyTorch
 import torch
+# -----------------------------------
+EPOH = 100
+# -----------------------------------
+equalLoss = []
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+global_Loss = 0
+
+
 
 # x_min, x_max - минимальное и максимальное значение по оси X
 x_min, x_max = 0, 2
@@ -11,10 +22,10 @@ y_min, y_max = 0, 2
 Nx, Ny = 100, 100
 
 # Создаем равномерно распределенные точки по оси X
-x = torch.linspace(x_min, x_max, Nx)
+x = torch.linspace(x_min, x_max, Nx).to(device)
 
 # Создаем равномерно распределенные точки по оси Y
-y = torch.linspace(y_min, y_max, Ny)
+y = torch.linspace(y_min, y_max, Ny).to(device)
 
 # Создаем сетку координат X и Y
 # X и Y - это 2D тензоры, где каждый элемент представляет соответствующую координату
@@ -32,35 +43,30 @@ mask[1:-1, 1:-1] = True
 # X[mask] выбирает все точки, где mask == True
 # flatten() преобразует результат в 1D тензор
 # stack() объединяет координаты X и Y в один 2D тензор
-interior_points = torch.stack([X[mask].flatten(), Y[mask].flatten()], dim=1)
+interior_X = X[mask].flatten()
+interior_Y = Y[mask].flatten()
+
+interior_X.requires_grad = True
+interior_Y.requires_grad = True
+
+interior_points = torch.stack([interior_X, interior_Y], dim=1)
+
+# Присвоение requres_grad всем координатам точек тензора
 
 # Аналогично создаем тензор с граничными точками
 # ~mask инвертирует маску, выбирая граничные точки
-boundary_points = torch.stack([X[~mask].flatten(), Y[~mask].flatten()], dim=1)
+boundary_X = X[~mask].flatten()
+boundary_Y = Y[~mask].flatten()
 
-f = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,interior_points[:, 0])) ,torch.sin(torch.mul(torch.pi,interior_points[:, 1]))  ))).unsqueeze(1)
+boundary_X.requires_grad = True
+boundary_Y.requires_grad = True
 
-print(interior_points)
+boundary_points = torch.stack([boundary_X, boundary_Y], dim=1)
 
+all_the_X = X.flatten()
+all_the_Y = Y.flatten()
 
+all_points = torch.stack([all_the_X, all_the_Y], dim=1)
 
-
-# ----------------------------------------------------------------------
-
-
-
-
-interior_points.requires_grad = True
-
-f = interior_points * 2 + 1
-
-dudx = torch.autograd.grad(f, interior_points, torch.ones_like(interior_points), create_graph=True, retain_graph=True)[0]
-
-mask = torch.zeros_like(dudx, dtype=bool)
-
-mask[:, 0] = True
-
-print(dudx)
-
-
+print(torch.mul(torch.sin(torch.pi * all_the_X),torch.sin(torch.pi * all_the_Y)))
 
