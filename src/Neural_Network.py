@@ -103,7 +103,7 @@ class simpleModel(nn.Module):
 
 def pde(out, t, tensor_X, tensor_Y):
 
-    dudt = torch.autograd.grad(out, [tensor_X, tensor_Y], grad_outputs=torch.ones_like(out), create_graph=True, retain_graph=True, allow_unused=True)
+    dudt = torch.autograd.grad(out, [tensor_X, tensor_Y], grad_outputs=torch.ones_like(out), create_graph=True, retain_graph=True)
 
     dudx = dudt[0]
 
@@ -120,23 +120,20 @@ def pdeLoss(model, lambd):
 
 
    u_inside = pde(out_inside, interior_points, interior_X, interior_Y)
-   u_border = pde(out_border, boundary_points, boundary_X, boundary_Y)
 
 
-   g = torch.zeros_like(u_border)
-   f_inside = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,interior_points[:, 0])) ,torch.sin(torch.mul(torch.pi,interior_points[:, 1]))  ))).unsqueeze(1)
-
+   g = torch.zeros_like(out_border)
+   f_inside = torch.mul(-2, torch.mul(torch.pi ** 2, torch.mul( torch.sin(torch.mul(torch.pi,interior_points[:, 0])) ,torch.sin(torch.mul(torch.pi,interior_points[:, 1]))  )))
+   #print(u_inside.shape)
 
    loss_PDE = metric_data(u_inside, f_inside)
-   loss_BC = metric_data(u_border, g)
-   loss = loss_PDE + lambd * loss_BC
-   global global_Loss
-   global_Loss = loss
+   loss_BC = metric_data(out_border, g)
+   loss = loss_PDE +loss_BC
    return loss
 
 def train(model, lambd):
         pbar = tqdm(range(EPOH),desc='Training Progress')
-        optimizer = torch.optim.LBFGS(model.parameters())
+        optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
         for step in pbar:
             def closure():
                 optimizer.zero_grad()
