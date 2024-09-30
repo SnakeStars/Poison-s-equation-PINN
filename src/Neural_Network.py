@@ -16,7 +16,7 @@ import optuna
 
 
 # -----------------------------------
-EPOH = 100
+EPOH = 1000
 # -----------------------------------
 equalLoss = []
 
@@ -144,7 +144,7 @@ def train(model, lambd, trial=None):
                 loss.backward()
                 return loss
             
-            equal_loss = torch.norm(equal_f() - model(all_points).to(device), p=float('inf')).item()
+            equal_loss = torch.norm(equal_f() - model(all_points).to(device).squeeze(1), p=float('inf')).item()
             equalLoss.append(equal_loss)
             if trial != None:
 
@@ -167,13 +167,14 @@ def show(z):
     Z = np.reshape(z, (len(X), len(X)))
     fig1, ax1 = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(16, 9))
     ax1.plot_surface(X.cpu(),Y.cpu(),Z, cmap='hot')
+    #ax1.plot_surface(X.cpu(),Y.cpu(), np.reshape(equal_f().cpu(), (len(X), len(X))))
     ax1.set_xlabel('x')
     ax1.set_ylabel('y')
     ax1.set_zlabel('z')
     fig2, ax2 = plt.subplots()
 
     fs = 12
-    margins = {                                               # +++                                          
+    margins = {
     "left"   : 0.040,
     "bottom" : 0.060,
     "right"  : 0.950,
@@ -190,5 +191,4 @@ if __name__ == "__main__":
     neural_model = simpleModel().to(device)
     train(neural_model, 1)
     show(neural_model(all_points).to(device).cpu().detach().numpy())
-    print(equal_f()[510])
     plt.show()
