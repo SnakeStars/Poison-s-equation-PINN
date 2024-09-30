@@ -24,6 +24,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 metric_data = nn.MSELoss()
 
 
+global_Loss = 0
+
+
 
 # x_min, x_max - минимальное и максимальное значение по оси X
 x_min, x_max = 0, 2
@@ -98,16 +101,15 @@ class simpleModel(nn.Module):
   def forward(self, x):
     return self.layers_stack(x)
 
-def pde(out, t):
+def pde(out, t, tensor_X, tensor_Y):
 
-    dudt = torch.autograd.grad(out, [interior_X, interior_Y], grad_outputs=torch.ones_like(out), create_graph=True, retain_graph=True, allow_unused=True)
+    dudt = torch.autograd.grad(out, [tensor_X, tensor_Y], grad_outputs=torch.ones_like(out), create_graph=True, retain_graph=True, allow_unused=True)
 
     dudx = dudt[0]
 
     dudy = dudt[1]
-    print(dudt)
-    x_result = torch.autograd.grad(dudx, interior_X, grad_outputs=torch.ones_like(dudx),create_graph=True, retain_graph=True, allow_unused=True)[0]
-    y_result = torch.autograd.grad(dudy, interior_Y, grad_outputs=torch.ones_like(dudy), create_graph=True, retain_graph=True, allow_unused=True)[0]
+    x_result = torch.autograd.grad(dudx, tensor_X, grad_outputs=torch.ones_like(dudx),create_graph=True, retain_graph=True, allow_unused=True)[0]
+    y_result = torch.autograd.grad(dudy, tensor_Y, grad_outputs=torch.ones_like(dudy), create_graph=True, retain_graph=True, allow_unused=True)[0]
 
     return x_result + y_result
 
@@ -117,8 +119,8 @@ def pdeLoss(model, lambd):
    out_border = model(boundary_points).to(device)
 
 
-   u_inside = pde(out_inside, interior_points)
-   u_border = pde(out_border, boundary_points)
+   u_inside = pde(out_inside, interior_points, interior_X, interior_Y)
+   u_border = pde(out_border, boundary_points, boundary_X, boundary_Y)
 
 
    g = torch.zeros_like(u_border)
@@ -128,12 +130,14 @@ def pdeLoss(model, lambd):
    loss_PDE = metric_data(u_inside, f_inside)
    loss_BC = metric_data(u_border, g)
    loss = loss_PDE + lambd * loss_BC
+   global global_Loss
+   global_Loss = loss
    return loss
 
 def train(model, lambd):
         pbar = tqdm(range(EPOH),desc='Training Progress')
         optimizer = torch.optim.LBFGS(model.parameters())
-        for stepd in pbar:
+        for step in pbar:
             def closure():
                 optimizer.zero_grad()
                 loss = pdeLoss(model, lambd)
@@ -141,16 +145,17 @@ def train(model, lambd):
                 return loss
 
             optimizer.step(closure)
-            if stepd % 2 == 0:
+            if step % 2 == 0:
                 current_loss = closure().item()
-                pbar.set_description("Lambda: %.4f | Step: %d | Loss: %.7f" %
-                                 (lambd, stepd, los))
+                pbar.set_description("Step: %d | Loss: %.6f" %
+                                 (step, current_loss))
+
         pbar.clear()
 def show(z):
     plt.style.use('_mpl-gallery')
     Z = np.reshape(z, (len(X), len(X)))
     fig1, ax1 = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(16, 9))
-    ax1.plot_surface(X,Y,Z, cmap='hot')
+    ax1.plot_surface(X.cpu(),Y.cpu(),Z, cmap='hot')
     ax1.set_xlabel('x')
     ax1.set_ylabel('y')
     ax1.set_zlabel('z')
