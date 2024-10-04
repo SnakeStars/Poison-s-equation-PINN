@@ -16,7 +16,7 @@ import optuna
 
 
 # -----------------------------------
-EPOH = 20000
+EPOH = 30000
 # -----------------------------------
 equalLoss = []
 Loss = []
@@ -138,7 +138,7 @@ def pdeLoss(model, lambd):
 def train(model, lambd, trial=None):
         pbar = tqdm(range(EPOH),desc='Training Progress')
         optimizer = torch.optim.Adam(model.parameters())
-        check = 0
+        check = 1
         for step in pbar:
             def closure():
                 global current_loss
@@ -149,19 +149,19 @@ def train(model, lambd, trial=None):
                 return loss
             
             equal_loss = torch.norm(equal_f() - model(all_points).to(device).squeeze(1), p=float('inf')).item()
-            equalLoss.append(equal_loss)
-            Loss.append(current_loss)
-            if step > EPOH - 4000 and check == 0:
-                optimizer = torch.optim.Adam(model.parameters(), 1e-4)
-                check=1
-            if step > EPOH - 2000 and check == 1:
-                optimizer = torch.optim.Adam(model.parameters(), 1e-5)
-                check=2
             if trial != None:
 
                 trial.report
 
             optimizer.step(closure)
+
+            if step == 20000 and check:
+                optimizer = torch.optim.Adam(model.parameters(), 1e-4)
+                check = 0
+            if trial == None:
+                equalLoss.append(equal_loss)
+                Loss.append(current_loss)
+
             if step % 2 == 0:
                 pbar.set_description("Step: %d | Loss: %.7f" %
                                  (step, current_loss))
@@ -215,6 +215,8 @@ def show(z):
 
 if __name__ == "__main__":
     neural_model = simpleModel().to(device)
+    # torch.save(neural_model.state_dict(), 'neural_model_weigths.pth')
+    neural_model.load_state_dict(torch.load('neural_model_weigths.pth', map_location=torch.device('cpu')))
     train(neural_model, 1)
     show(neural_model(all_points).to(device).cpu().detach().numpy())
     plt.show()
