@@ -16,9 +16,11 @@ import optuna
 
 
 # -----------------------------------
-EPOH = 1000
+EPOH = 20000
 # -----------------------------------
 equalLoss = []
+Loss = []
+current_loss = 0
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -103,14 +105,13 @@ class simpleModel(nn.Module):
     return self.layers_stack(x)
 
 def pde(out, t, tensor_X, tensor_Y):
-
-    dudt = torch.autograd.grad(out, [tensor_X, tensor_Y], grad_outputs=torch.ones_like(out), create_graph=True, retain_graph=True)
+    dudt = torch.autograd.grad(out, [tensor_X, tensor_Y], grad_outputs=torch.ones_like(out), create_graph=True)
 
     dudx = dudt[0]
 
     dudy = dudt[1]
-    x_result = torch.autograd.grad(dudx, tensor_X, grad_outputs=torch.ones_like(dudx),create_graph=True, retain_graph=True, allow_unused=True)[0]
-    y_result = torch.autograd.grad(dudy, tensor_Y, grad_outputs=torch.ones_like(dudy), create_graph=True, retain_graph=True, allow_unused=True)[0]
+    x_result = torch.autograd.grad(dudx, tensor_X, grad_outputs=torch.ones_like(dudx),create_graph=True, allow_unused=True)[0]
+    y_result = torch.autograd.grad(dudy, tensor_Y, grad_outputs=torch.ones_like(dudy), create_graph=True, allow_unused=True)[0]
 
     return x_result + y_result
 
@@ -136,24 +137,33 @@ def pdeLoss(model, lambd):
 
 def train(model, lambd, trial=None):
         pbar = tqdm(range(EPOH),desc='Training Progress')
-        optimizer = torch.optim.LBFGS(model.parameters(), lr=0.1)
+        optimizer = torch.optim.Adam(model.parameters())
+        check = 0
         for step in pbar:
             def closure():
+                global current_loss
                 optimizer.zero_grad()
                 loss = pdeLoss(model, lambd)
+                current_loss = loss.item()
                 loss.backward()
                 return loss
             
             equal_loss = torch.norm(equal_f() - model(all_points).to(device).squeeze(1), p=float('inf')).item()
             equalLoss.append(equal_loss)
+            Loss.append(current_loss)
+            if step > EPOH - 4000 and check == 0:
+                optimizer = torch.optim.Adam(model.parameters(), 1e-4)
+                check=1
+            if step > EPOH - 2000 and check == 1:
+                optimizer = torch.optim.Adam(model.parameters(), 1e-5)
+                check=2
             if trial != None:
 
                 trial.report
 
             optimizer.step(closure)
             if step % 2 == 0:
-                current_loss = closure().item()
-                pbar.set_description("Step: %d | Loss: %.6f" %
+                pbar.set_description("Step: %d | Loss: %.7f" %
                                  (step, current_loss))
 
         pbar.clear()
@@ -185,6 +195,22 @@ def show(z):
     ax2=plt.gca()
     ax2.plot(equalLoss)
     ax2.set_yscale('log')
+
+    fig3, ax3 = plt.subplots()
+
+    fs = 12
+    margins = {
+    "left"   : 0.040,
+    "bottom" : 0.060,
+    "right"  : 0.950,
+    "top"    : 0.950   
+    }
+    fig3.subplots_adjust(**margins) 
+
+    ax3=plt.gca()
+    ax3.plot(Loss)
+    ax3.set_yscale('log')
+    ax3.set_ylabel("LOSS")
 
 
 if __name__ == "__main__":
