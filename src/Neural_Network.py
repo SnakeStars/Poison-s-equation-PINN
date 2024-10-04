@@ -13,6 +13,7 @@ import matplotlib
 from matplotlib import cm
 import numpy as np
 import optuna
+from Activation_functions.Activation_sin_cos import Sin, Cos
 
 
 # -----------------------------------
@@ -93,11 +94,11 @@ class simpleModel(nn.Module):
     super().__init__()
     self.layers_stack = nn.Sequential(
         nn.Linear(2, hidden_size),
-        nn.Tanh(),
+        Sin(),
         nn.Linear(hidden_size, hidden_size), #1
-        nn.Tanh(),
+        Sin(),
         nn.Linear(hidden_size, hidden_size), #2
-        nn.Tanh(),
+        Sin(),
         nn.Linear(hidden_size, 1),
     )
 
@@ -132,7 +133,7 @@ def pdeLoss(model, lambd):
 
    loss_PDE = metric_data(u_inside, f_inside)
    loss_BC = metric_data(out_border, g)
-   loss = loss_PDE +loss_BC
+   loss = loss_PDE + loss_BC
    return loss
 
 def train(model, lambd, trial=None):
@@ -155,7 +156,7 @@ def train(model, lambd, trial=None):
 
             optimizer.step(closure)
 
-            if step == 20000 and check:
+            if step >= 29000 and check:
                 optimizer = torch.optim.Adam(model.parameters(), 1e-4)
                 check = 0
             if trial == None:
