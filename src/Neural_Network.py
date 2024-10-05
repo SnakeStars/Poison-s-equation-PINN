@@ -17,7 +17,8 @@ from Activation_functions.Activation_sin_cos import Sin, Cos
 
 
 # -----------------------------------
-EPOH = 30000
+EPOH = 20000
+research = 1                        # 0 if show result, 1 if start research
 # -----------------------------------
 equalLoss = []
 Loss = []
@@ -133,13 +134,13 @@ def pdeLoss(model, lambd):
 
    loss_PDE = metric_data(u_inside, f_inside)
    loss_BC = metric_data(out_border, g)
-   loss = loss_PDE + loss_BC
+   loss = loss_PDE + lambd * loss_BC
    return loss
 
 def train(model, lambd, trial=None):
         pbar = tqdm(range(EPOH),desc='Training Progress')
         optimizer = torch.optim.Adam(model.parameters())
-        check = 1
+        check = 0
         for step in pbar:
             def closure():
                 global current_loss
@@ -150,28 +151,29 @@ def train(model, lambd, trial=None):
                 return loss
             
             equal_loss = torch.norm(equal_f() - model(all_points).to(device).squeeze(1), p=float('inf')).item()
-            if trial != None:
-
-                trial.report
 
             optimizer.step(closure)
 
-            if step >= 29000 and check:
+            if trial != None:
+                trial.report(equal_loss, step)
+
+                if trial.should_prune():
+                    pbar.clear()
+                    raise optuna.TrialPruned()
+            if step >= 18000 and check:
                 optimizer = torch.optim.Adam(model.parameters(), 1e-4)
-                check = 0
+                check = 1
             if trial == None:
                 equalLoss.append(equal_loss)
                 Loss.append(current_loss)
 
             if step % 2 == 0:
-                pbar.set_description("Step: %d | Loss: %.7f" %
-                                 (step, current_loss))
+                pbar.set_description("Step: %d | Loss: %.7f | Lambda: %.6f" %
+                                 (step, current_loss, lambd))
 
         pbar.clear()
-
-def objective(trial):
-    neural_model = simpleModel().to(device)
-    train(neural_model, 1)
+        if trial != None:
+            return equal_loss
 
 def show(z):
     plt.style.use('_mpl-gallery')
@@ -213,11 +215,72 @@ def show(z):
     ax3.set_yscale('log')
     ax3.set_ylabel("LOSS")
 
+def objective(trial):
+    neural_model = simpleModel().to(device)
+    neural_model.load_state_dict(torch.load('neural_model_weigths.pth', map_location=torch.device(device), weights_only=True))
+    x = trial.suggest_float('x', 1e-6, 1e6, log=True)
+    err = train(neural_model, x, trial)
+    return err
+
+def study_show(study):
+    ax1 = optuna.visualization.matplotlib.plot_intermediate_values(study)
+    ax2 = optuna.visualization.matplotlib.plot_intermediate_values(study)
+    ax3 = optuna.visualization.matplotlib.plot_intermediate_values(study)
+    ax4 = optuna.visualization.matplotlib.plot_optimization_history(study,target_name='loss')
+    plt.tight_layout()
+
+    ax1.set_yscale('log')
+    ax1.set_xlim(-5,1000)
+    ax1.set_title("Hyperparameter selection")
+    ax1.set_xlabel("EPOH")
+    ax1.set_ylabel("Loss")
+
+    ax2.set_yscale('log')
+    ax2.set_xlim(EPOH - 1000,EPOH+5)
+    ax2.set_title("Hyperparameter selection")
+    ax2.set_xlabel("EPOH")
+    ax2.set_ylabel("Loss")
+
+    ax3.set_yscale('log')
+    ax3.set_title("Hyperparameter selection")
+    ax3.set_xlabel("EPOH")
+    ax3.set_ylabel("Loss")
+
+    ax4.set_yscale('log')
+    ax4.set_title("Hyperparameter selection")
+    ax4.set_ylabel("Loss")
+
+    ax1.get_figure().set_size_inches(16, 9)
+    ax2.get_figure().set_size_inches(16, 9)
+    ax3.get_figure().set_size_inches(16, 9)
+    ax4.get_figure().set_size_inches(16, 9)
+
+    ax1.get_figure().savefig('Losses_begin.png')
+    ax2.get_figure().savefig('Losses_end.png')
+    ax3.get_figure().savefig('Losses_total.png')
+    ax4.get_figure().savefig('history_losses.png')
+
+    f = open("Best value.txt", "w")
+    f.write(str(study.best_params["x"]))
+    f.close()
+
+    plt.show()
 
 if __name__ == "__main__":
-    neural_model = simpleModel().to(device)
-    # torch.save(neural_model.state_dict(), 'neural_model_weigths.pth')
-    neural_model.load_state_dict(torch.load('neural_model_weigths.pth', map_location=torch.device('cpu')))
-    train(neural_model, 1)
-    show(neural_model(all_points).to(device).cpu().detach().numpy())
-    plt.show()
+    if research:
+        study = optuna.create_study(
+            direction="minimize",
+            pruner=optuna.pruners.MedianPruner(
+                n_startup_trials=3, n_warmup_steps=400, interval_steps=300
+                ),
+                )
+        study.optimize(objective, n_trials=10)
+        study_show(study)
+    else:
+        neural_model = simpleModel().to(device)
+        neural_model.load_state_dict(torch.load('neural_model_weigths.pth', map_location=torch.device(device), weights_only=True))
+        train(neural_model, 20)
+        show(neural_model(all_points).to(device).cpu().detach().numpy())
+        plt.show()
+
+    
