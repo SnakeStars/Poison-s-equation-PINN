@@ -23,6 +23,7 @@ research = 1                        # 0 if show result, 1 if start research
 equalLoss = []
 Loss = []
 current_loss = 0
+equal_loss = 0
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -143,14 +144,14 @@ def train(model, lambd, trial=None):
         check = 0
         for step in pbar:
             def closure():
+                global equal_loss
                 global current_loss
                 optimizer.zero_grad()
                 loss = pdeLoss(model, lambd)
                 current_loss = loss.item()
                 loss.backward()
+                equal_loss = torch.norm(equal_f() - model(all_points).to(device).squeeze(1), p=float('inf')).item()
                 return loss
-            
-            equal_loss = torch.norm(equal_f() - model(all_points).to(device).squeeze(1), p=float('inf')).item()
 
             optimizer.step(closure)
 
@@ -160,9 +161,12 @@ def train(model, lambd, trial=None):
                 if trial.should_prune():
                     pbar.clear()
                     raise optuna.TrialPruned()
-            if step >= 18000 and check:
+            if step >= 18000 and check == 0:
                 optimizer = torch.optim.Adam(model.parameters(), 1e-4)
                 check = 1
+            if step >= 19900 and check == 1:
+                optimizer = torch.optim.Adam(model.parameters(), 1e-5)
+                check = 2
             if trial == None:
                 equalLoss.append(equal_loss)
                 Loss.append(current_loss)
@@ -173,7 +177,7 @@ def train(model, lambd, trial=None):
 
         pbar.clear()
         if trial != None:
-            return equal_loss
+            return torch.norm(equal_f() - model(all_points).to(device).squeeze(1), p=float('inf')).item()
 
 def show(z):
     plt.style.use('_mpl-gallery')
@@ -231,13 +235,13 @@ def study_show(study):
     plt.tight_layout()
 
     ax1.set_yscale('log')
-    ax1.set_xlim(-5,1000)
+    ax1.set_xlim(-5,3000)
     ax1.set_title("Hyperparameter selection")
     ax1.set_xlabel("EPOH")
     ax1.set_ylabel("Analytical deviation")
 
     ax2.set_yscale('log')
-    ax2.set_xlim(EPOH - 1000,EPOH+5)
+    ax2.set_xlim(EPOH - 1500,EPOH+5)
     ax2.set_title("Hyperparameter selection")
     ax2.set_xlabel("EPOH")
     ax2.set_ylabel("Analytical deviation")
@@ -280,7 +284,7 @@ if __name__ == "__main__":
                 n_startup_trials=10, n_warmup_steps=2500, interval_steps=300
                 ),
                 )
-        study.optimize(objective, n_trials=200)
+        study.optimize(objective, n_trials=3)
         study_show(study)
     else:
         neural_model = simpleModel().to(device)
