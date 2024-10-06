@@ -226,39 +226,45 @@ def study_show(study):
     ax1 = optuna.visualization.matplotlib.plot_intermediate_values(study)
     ax2 = optuna.visualization.matplotlib.plot_intermediate_values(study)
     ax3 = optuna.visualization.matplotlib.plot_intermediate_values(study)
-    ax4 = optuna.visualization.matplotlib.plot_optimization_history(study,target_name='loss')
+    ax4 = optuna.visualization.matplotlib.plot_optimization_history(study)
+    ax5 = optuna.visualization.matplotlib.plot_parallel_coordinate(study)
     plt.tight_layout()
 
     ax1.set_yscale('log')
     ax1.set_xlim(-5,1000)
     ax1.set_title("Hyperparameter selection")
     ax1.set_xlabel("EPOH")
-    ax1.set_ylabel("Loss")
+    ax1.set_ylabel("Analytical deviation")
 
     ax2.set_yscale('log')
     ax2.set_xlim(EPOH - 1000,EPOH+5)
     ax2.set_title("Hyperparameter selection")
     ax2.set_xlabel("EPOH")
-    ax2.set_ylabel("Loss")
+    ax2.set_ylabel("Analytical deviation")
 
     ax3.set_yscale('log')
     ax3.set_title("Hyperparameter selection")
     ax3.set_xlabel("EPOH")
-    ax3.set_ylabel("Loss")
+    ax3.set_ylabel("Analytical deviation")
 
     ax4.set_yscale('log')
     ax4.set_title("Hyperparameter selection")
-    ax4.set_ylabel("Loss")
+    ax4.set_ylabel("Analytical deviation")
+
+    ax5.set_yscale('log')
+    ax5.set_title("Hyperparameter selection")
 
     ax1.get_figure().set_size_inches(16, 9)
     ax2.get_figure().set_size_inches(16, 9)
     ax3.get_figure().set_size_inches(16, 9)
     ax4.get_figure().set_size_inches(16, 9)
+    ax5.get_figure().set_size_inches(16, 9)
 
     ax1.get_figure().savefig('Losses_begin.png')
     ax2.get_figure().savefig('Losses_end.png')
     ax3.get_figure().savefig('Losses_total.png')
     ax4.get_figure().savefig('history_losses.png')
+    ax5.get_figure().savefig('paretto.png')
 
     f = open("Best value.txt", "w")
     f.write(str(study.best_params["x"]))
@@ -271,15 +277,15 @@ if __name__ == "__main__":
         study = optuna.create_study(
             direction="minimize",
             pruner=optuna.pruners.MedianPruner(
-                n_startup_trials=3, n_warmup_steps=400, interval_steps=300
+                n_startup_trials=10, n_warmup_steps=2500, interval_steps=300
                 ),
                 )
-        study.optimize(objective, n_trials=10)
+        study.optimize(objective, n_trials=200)
         study_show(study)
     else:
         neural_model = simpleModel().to(device)
         neural_model.load_state_dict(torch.load('neural_model_weigths.pth', map_location=torch.device(device), weights_only=True))
-        train(neural_model, 20)
+        train(neural_model, 753)
         show(neural_model(all_points).to(device).cpu().detach().numpy())
         plt.show()
 
