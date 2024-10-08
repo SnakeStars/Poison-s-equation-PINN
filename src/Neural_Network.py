@@ -284,7 +284,7 @@ if __name__ == "__main__":
                 n_startup_trials=10, n_warmup_steps=2500, interval_steps=300
                 ),
                 )
-        study.optimize(objective, n_trials=3)
+        study.optimize(objective, n_trials=200)
         study_show(study)
     else:
         neural_model = simpleModel().to(device)
