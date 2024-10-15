@@ -20,10 +20,14 @@ from Activation_functions.Activation_sin_cos import Sin, Cos
 EPOH = 20000
 research = 1                        # 0 if show result, 1 if start research
 # -----------------------------------
-equalLoss = []
+equalLossDeviation = []
 Loss = []
 current_loss = 0
 equal_loss = 0
+equalLossFinal = []
+arr_lambdas = [1e-6, 1e-5, 1e-4]
+# arr_lambdas = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 0.05, 0.1, 0.5, 1, 10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1e3, 1500, 2500, 5000, 10e4, 10e5, 10e6]
+len(arr_lambdas)
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -142,6 +146,7 @@ def train(model, lambd, trial=None):
         pbar = tqdm(range(EPOH),desc='Training Progress')
         optimizer = torch.optim.Adam(model.parameters())
         check = 0
+        deviation = 0
         for step in pbar:
             def closure():
                 global equal_loss
@@ -164,19 +169,20 @@ def train(model, lambd, trial=None):
             if step >= 18000 and check == 0:
                 optimizer = torch.optim.Adam(model.parameters(), 1e-4)
                 check = 1
+            if check == 2:
+                deviation += equal_loss
             if step >= 19900 and check == 1:
                 optimizer = torch.optim.Adam(model.parameters(), 1e-5)
                 check = 2
-            if trial == None:
-                equalLoss.append(equal_loss)
-                Loss.append(current_loss)
-
             if step % 2 == 0:
                 pbar.set_description("Step: %d | Loss: %.7f | Lambda: %.6f" %
                                  (step, current_loss, lambd))
 
         pbar.clear()
         if trial != None:
+            equalLossDeviation.append(deviation/100)
+            equalLossFinal.append(equal_loss)
+            Loss.append(current_loss)
             return torch.norm(equal_f() - model(all_points).to(device).squeeze(1), p=float('inf')).item()
 
 def show(z):
@@ -200,7 +206,7 @@ def show(z):
     fig2.subplots_adjust(**margins) 
 
     ax2=plt.gca()
-    ax2.plot(equalLoss)
+    # ax2.plot(equalLoss)
     ax2.set_yscale('log')
 
     fig3, ax3 = plt.subplots()
@@ -220,9 +226,11 @@ def show(z):
     ax3.set_ylabel("LOSS")
 
 def objective(trial):
+    # equalLoss.append([])
+    k=0
     neural_model = simpleModel().to(device)
     neural_model.load_state_dict(torch.load('neural_model_weigths.pth', map_location=torch.device(device), weights_only=True))
-    x = trial.suggest_float('x', 1e-6, 1e6, log=True)
+    x = trial.suggest_categorical('x', arr_lambdas)
     err = train(neural_model, x, trial)
     return err
 
@@ -270,21 +278,25 @@ def study_show(study):
     ax4.get_figure().savefig('history_losses.png')
     ax5.get_figure().savefig('paretto.png')
 
-    f = open("Best value.txt", "w")
-    f.write(str(study.best_params["x"]))
+    f = open("Values.txt", "w")
+    f.write("lambda | avr equal loss | fin equal loss | fin loss \n")
+    for i in range(len(equalLossDeviation)):
+        f.write(str(arr_lambdas[i]) + " | " + str(equalLossDeviation[i]) + " | " + str(equalLossFinal[i]) + " | "+ str(Loss[i])+"\n")
     f.close()
 
-    plt.show()
+    # plt.show()
 
 if __name__ == "__main__":
     if research:
         study = optuna.create_study(
             direction="minimize",
             pruner=optuna.pruners.MedianPruner(
-                n_startup_trials=10, n_warmup_steps=2500, interval_steps=300
+                n_startup_trials=len(arr_lambdas), n_warmup_steps=2500, interval_steps=300
                 ),
                 )
-        study.optimize(objective, n_trials=200)
+        for i in arr_lambdas:
+            study.enqueue_trial({"x": i})
+        study.optimize(objective, n_trials=len(arr_lambdas))
         study_show(study)
     else:
         neural_model = simpleModel().to(device)
